@@ -37,85 +37,102 @@ public class SincronizadorFTP {
 
     // Método sincronizar(), encargado de la sincronización entre el servidor FTP y la carpeta local
     private static void sincronizar() throws IOException {
-        // Se crea una instancia de FTPClient para interactuar con el servidor FTP
         FTPClient clienteFTP = new FTPClient();
-        clienteFTP.connect(SERVIDOR_FTP); // Se conecta al servidor FTP
-        clienteFTP.login(USUARIO, CONTRASENA); // Se realiza el inicio de sesión en el servidor FTP
-        // Se obtienen las listas de carpetas y archivos tanto en el servidor FTP como en la carpeta local
-        List<String> carpetasRemotas = obtenerCarpetasRemotas(clienteFTP, CARPETA_REMOTA);
-        List<String> carpetasLocales = obtenerCarpetasLocales(CARPETA_LOCAL);
-        List<String> archivosRemotos = obtenerArchivosRemotos(clienteFTP, CARPETA_REMOTA);
-        List<String> archivosLocales = obtenerArchivosLocales(CARPETA_LOCAL);
+        try {
+            // Se crea una instancia de FTPClient para interactuar con el servidor FTP
 
-        // Se recorren las carpetas remotas y se borran aquellas que no existen en la carpeta local
-        for (String carpetaRemota : carpetasRemotas) {
-            if (!carpetasLocales.contains(carpetaRemota)) {
-                borrarCarpeta(clienteFTP, carpetaRemota);
+            clienteFTP.connect(SERVIDOR_FTP); // Se conecta al servidor FTP
+            clienteFTP.login(USUARIO, CONTRASENA); // Se realiza el inicio de sesión en el servidor FTP
+            // Se obtienen las listas de carpetas y archivos tanto en el servidor FTP como en la carpeta local
+            List<String> carpetasRemotas = obtenerCarpetasRemotas(clienteFTP, CARPETA_REMOTA);
+            List<String> carpetasLocales = obtenerCarpetasLocales(CARPETA_LOCAL);
+            List<String> archivosRemotos = obtenerArchivosRemotos(clienteFTP, CARPETA_REMOTA);
+            List<String> archivosLocales = obtenerArchivosLocales(CARPETA_LOCAL);
+
+            // Se recorren las carpetas remotas y se borran aquellas que no existen en la carpeta local
+            for (String carpetaRemota : carpetasRemotas) {
+                if (!carpetasLocales.contains(carpetaRemota)) {
+                    borrarCarpeta(clienteFTP, carpetaRemota);
+                }
             }
-        }
 
-        // Se recorren los archivos remotos y se borran aquellos que no existen en la carpeta local
-        for (String archivoRemoto : archivosRemotos) {
-            if (!archivosLocales.contains(archivoRemoto)) {
-                borrarArchivo(clienteFTP, archivoRemoto);
+            // Se recorren los archivos remotos y se borran aquellos que no existen en la carpeta local
+            for (String archivoRemoto : archivosRemotos) {
+                if (!archivosLocales.contains(archivoRemoto)) {
+                    borrarArchivo(clienteFTP, archivoRemoto);
+                }
             }
-        }
 
-        // Se recorren las carpetas locales y se sincronizan con las correspondientes en el servidor FTP
-        for (String carpetaLocal : carpetasLocales) {
-            // Se construyen las rutas de la carpeta local y remota
-            String rutaCarpetaLocal = CARPETA_LOCAL + File.separator + carpetaLocal;
-            String rutaCarpetaRemota = CARPETA_REMOTA + "/" + carpetaLocal;
+            // Se recorren las carpetas locales y se sincronizan con las correspondientes en el servidor FTP
+            for (String carpetaLocal : carpetasLocales) {
+                // Se construyen las rutas de la carpeta local y remota
+                String rutaCarpetaLocal = CARPETA_LOCAL + File.separator + carpetaLocal;
+                String rutaCarpetaRemota = CARPETA_REMOTA + "/" + carpetaLocal;
 
-            // Si la carpeta local no existe en el servidor FTP, se crea
-            if (!carpetasRemotas.contains(carpetaLocal)) {
-                añadirCarpeta(clienteFTP, carpetaLocal);
-            } else {
-                // Si la carpeta local existe en el servidor FTP, se verifica si está actualizada
+                // Si la carpeta local no existe en el servidor FTP, se crea
                 if (!carpetasRemotas.contains(carpetaLocal)) {
                     añadirCarpeta(clienteFTP, carpetaLocal);
                 } else {
-                    // Si la carpeta local no está actualizada en el servidor FTP, se sincroniza el contenido
-                    long ultimaModificacionLocal = new File(rutaCarpetaLocal).lastModified();
-                    if (estaCarpetaActualizada(clienteFTP, rutaCarpetaRemota, ultimaModificacionLocal)) {
-                        // La carpeta local está actualizada, no hacer nada
-                    } else {
-                        // La carpeta local no está actualizada, se sincroniza su contenido eliminando y añadiendo nuevamente la carpeta en el servidor FTP
-                        borrarCarpeta(clienteFTP, rutaCarpetaRemota);
+                    // Si la carpeta local existe en el servidor FTP, se verifica si está actualizada
+                    if (!carpetasRemotas.contains(carpetaLocal)) {
                         añadirCarpeta(clienteFTP, carpetaLocal);
+                    } else {
+                        // Si la carpeta local no está actualizada en el servidor FTP, se sincroniza el contenido
+                        long ultimaModificacionLocal = new File(rutaCarpetaLocal).lastModified();
+                        if (estaCarpetaActualizada(clienteFTP, rutaCarpetaRemota, ultimaModificacionLocal)) {
+                            // La carpeta local está actualizada, no hacer nada
+                        } else {
+                            // La carpeta local no está actualizada, se sincroniza su contenido eliminando y añadiendo nuevamente la carpeta en el servidor FTP
+                            borrarCarpeta(clienteFTP, rutaCarpetaRemota);
+                            añadirCarpeta(clienteFTP, carpetaLocal);
+                        }
                     }
                 }
             }
-        }
 
-        // Se recorren los archivos locales y se suben al servidor FTP aquellos que no existen o están desactualizados
-        for (String archivoLocal : archivosLocales) {
-            File localFile = new File(CARPETA_LOCAL + File.separator + archivoLocal);
-            long ultimaModificacionLocal = localFile.lastModified();
+            // Se recorren los archivos locales y se suben al servidor FTP aquellos que no existen o están desactualizados
+            for (String archivoLocal : archivosLocales) {
+                File localFile = new File(CARPETA_LOCAL + File.separator + archivoLocal);
+                long ultimaModificacionLocal = localFile.lastModified();
 
-            if (!archivosRemotos.contains(archivoLocal) || esArchivoActualizado(clienteFTP, CARPETA_REMOTA, archivoLocal, ultimaModificacionLocal)) {
-                añadirArchivo(clienteFTP, archivoLocal);
+                if (!archivosRemotos.contains(archivoLocal) || esArchivoActualizado(clienteFTP, CARPETA_REMOTA,
+                        archivoLocal, ultimaModificacionLocal)) {
+                    añadirArchivo(clienteFTP, archivoLocal);
+                }
+            }
+        }catch (IOException e) {
+            System.err.println("Error al conectar al servidor FTP: " + e.getMessage());
+            // Aquí puedes agregar más detalles de manejo de errores según tus necesidades
+        } finally {
+            // Si es necesario, puedes cerrar la conexión en el bloque finally
+            try {
+                if (clienteFTP.isConnected()) {
+                    clienteFTP.disconnect();
+                }
+            } catch (IOException e) {
+                // Manejo de errores al cerrar la conexión
+                System.err.println("Error al cerrar la conexión FTP: " + e.getMessage());
             }
         }
 
-        clienteFTP.disconnect(); // Se desconecta del servidor FTP
     }
 
     // Métodos auxiliares para obtener archivos y carpetas, y realizar operaciones de sincronización
     // Estos métodos están implementados más abajo, se describirán en la siguiente parte del comentario
 
     // Método para verificar si un archivo local está actualizado en el servidor FTP
-    private static boolean esArchivoActualizado(FTPClient clienteFTP, String carpetaRemota, String nombreArchivo, long ultimaModificacionLocal) throws IOException {
-        clienteFTP.changeWorkingDirectory(carpetaRemota); // Se cambia al directorio remoto especificado
-        FTPFile[] archivosRemotos = clienteFTP.listFiles(); // Se obtiene la lista de archivos remotos
+    private static boolean esArchivoActualizado(FTPClient clienteFTP, String carpetaRemota, String nombreArchivo, long ultimaModificacionLocal) throws IOException
+        {
+            clienteFTP.changeWorkingDirectory(carpetaRemota); // Se cambia al directorio remoto especificado
+            FTPFile[] archivosRemotos = clienteFTP.listFiles(); // Se obtiene la lista de archivos remotos
 
-        // Se busca el archivo en la lista de archivos remotos
-        for (FTPFile archivoRemoto : archivosRemotos) {
-            if (archivoRemoto.getName().equals(nombreArchivo)) {
-                long ultimaModificacionRemota = archivoRemoto.getTimestamp().getTimeInMillis(); // Se obtiene la fecha de última modificación del archivo remoto
-                return ultimaModificacionLocal > ultimaModificacionRemota; // Se compara la fecha de última modificación local y remota
+            // Se busca el archivo en la lista de archivos remotos
+            for (FTPFile archivoRemoto : archivosRemotos) {
+                if (archivoRemoto.getName().equals(nombreArchivo)) {
+                    long ultimaModificacionRemota = archivoRemoto.getTimestamp().getTimeInMillis(); // Se obtiene la fecha de última modificación del archivo remoto
+                    return ultimaModificacionLocal > ultimaModificacionRemota; // Se compara la fecha de última modificación local y remota
+                }
             }
-        }
 
         return false; // Si el archivo no existe en el servidor FTP, se considera que no está actualizado
     }
@@ -185,8 +202,10 @@ public class SincronizadorFTP {
         if (listaArchivos != null) { // Se verifica si la lista de archivos no es nula
             for (File archivo : listaArchivos) { // Se recorre la lista de archivos
                 if (archivo.isDirectory()) { // Se verifica si el archivo es una carpeta
-                    carpetas.add(archivo.getAbsolutePath().replace(carpetaBase, "").substring(1)); // Se añade la ruta relativa de la carpeta a la lista
-                    obtenerCarpetasLocalesRecursivo(archivo, carpetas, carpetaBase); // Se llama recursivamente al método para la subcarpeta
+                    carpetas.add(archivo.getAbsolutePath().replace(carpetaBase, "").substring(1));
+                    // Se añade la ruta relativa de la carpeta a la lista
+                    obtenerCarpetasLocalesRecursivo(archivo, carpetas, carpetaBase);
+                    // Se llama recursivamente al método para la subcarpeta
                 }
             }
         }
@@ -218,11 +237,13 @@ public class SincronizadorFTP {
     private static void añadirArchivo(FTPClient clienteFTP, String nombreArchivo) throws IOException {
         FileInputStream fis = null; // Se declara un objeto FileInputStream para leer el archivo local
         try {
-            File archivoLocal = new File(CARPETA_LOCAL + File.separator + nombreArchivo); // Se crea un objeto File con la ruta del archivo local
+            File archivoLocal = new File(CARPETA_LOCAL + File.separator + nombreArchivo);
+            // Se crea un objeto File con la ruta del archivo local
             fis = new FileInputStream(archivoLocal); // Se crea el FileInputStream con el archivo local
             boolean success = clienteFTP.storeFile(nombreArchivo, fis); // Se sube el archivo al servidor FTP
             if (!success) { // Se verifica si la operación fue exitosa
-                System.err.println("No se pudo subir el archivo '" + nombreArchivo + "' al servidor FTP."); // Se imprime un mensaje de error
+                System.err.println("No se pudo subir el archivo '" + nombreArchivo + "' al servidor FTP.");
+                // Se imprime un mensaje de error
             }
         } finally {
             if (fis != null) {
@@ -234,9 +255,11 @@ public class SincronizadorFTP {
     // Método para añadir una carpeta al servidor FTP (y sus archivos)
     private static void añadirCarpeta(FTPClient clienteFTP, String carpeta) throws IOException {
         clienteFTP.makeDirectory(carpeta); // Se crea la carpeta en el servidor FTP
-        List<String> archivosLocales = obtenerArchivosLocales(CARPETA_LOCAL + File.separator + carpeta); // Se obtiene la lista de archivos en la carpeta local
+        List<String> archivosLocales = obtenerArchivosLocales(CARPETA_LOCAL + File.separator + carpeta);
+        // Se obtiene la lista de archivos en la carpeta local
         for (String archivo : archivosLocales) { // Se recorre la lista de archivos
-            añadirArchivo(clienteFTP, carpeta + File.separator + archivo); // Se añade cada archivo al servidor FTP dentro de la carpeta creada
+            añadirArchivo(clienteFTP, carpeta + File.separator + archivo);
+            // Se añade cada archivo al servidor FTP dentro de la carpeta creada
         }
     }
 }
